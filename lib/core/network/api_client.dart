@@ -29,6 +29,12 @@ class ApiClient {
   Future<Map<String, dynamic>> customer(int customerId) async => Map<String, dynamic>.from((await _dio.get('/customers/$customerId')).data as Map);
   Future<Map<String, dynamic>> updateCustomer(int customerId, Map<String, dynamic> data) async => Map<String, dynamic>.from((await _dio.patch('/customers/$customerId', data: data)).data as Map);
   Future<Map<String, dynamic>> reportSummary({int days = 30}) async => Map<String, dynamic>.from((await _dio.get('/reports/summary', queryParameters: {'days': days})).data as Map);
+  Future<Map<String, dynamic>> coupons({String search = ''}) async => Map<String, dynamic>.from((await _dio.get('/coupons', queryParameters: {'search': search, 'limit': 50})).data as Map);
+  Future<Map<String, dynamic>> createCoupon(Map<String, dynamic> data) async => Map<String, dynamic>.from((await _dio.post('/coupons', data: data)).data as Map);
+  Future<Map<String, dynamic>> updateCoupon(int couponId, Map<String, dynamic> data) async => Map<String, dynamic>.from((await _dio.patch('/coupons/$couponId', data: data)).data as Map);
+  Future<List<dynamic>> reviews({String status = 'all'}) async => (await _dio.get('/reviews', queryParameters: {'status': status})).data as List<dynamic>;
+  Future<Map<String, dynamic>> updateReview(int reviewId, String status) async => Map<String, dynamic>.from((await _dio.patch('/reviews/$reviewId', data: {'status': status})).data as Map);
+  Future<Map<String, dynamic>> notifications() async => Map<String, dynamic>.from((await _dio.get('/notifications')).data as Map);
   Future<Map<String, dynamic>> registerShipment(int orderId, Map<String, dynamic> options) async => Map<String, dynamic>.from((await _dio.post('/tapin/register/$orderId', data: options)).data as Map);
   Future<Map<String, dynamic>> shipmentPdf(List<String> ids, {required String type}) async => Map<String, dynamic>.from((await _dio.post('/tapin/pdf', data: {'ids': ids, 'type': type})).data as Map);
 }
