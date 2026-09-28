@@ -17,6 +17,8 @@ jobs:
         with:
           channel: stable
           cache: true
+      - name: Prepare brand assets
+        run: base64 --decode assets/woo_manager_logo.png.b64 > assets/woo_manager_logo.png
       - name: Create Android project
         run: flutter create --platforms=android --org=ir.sahand.woomanager --project-name=woo_manager_app .
       - name: Configure Android release
@@ -51,6 +53,11 @@ jobs:
           path.write_text(text)
           PY
           fi
+          for pair in "mdpi:48" "hdpi:72" "xhdpi:96" "xxhdpi:144" "xxxhdpi:192"; do
+            density="${pair%%:*}"
+            size="${pair##*:}"
+            convert assets/woo_manager_logo.png -resize "${size}x${size}" "android/app/src/main/res/mipmap-${density}/ic_launcher.png"
+          done
       - run: flutter pub get
       - run: dart format lib test
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings
@@ -61,12 +68,12 @@ jobs:
         run: flutter build appbundle --release
       - uses: actions/upload-artifact@v4
         with:
-          name: woo-manager-app-1.0.0-apk
+          name: woo-manager-app-1.0.1-apk
           path: build/app/outputs/flutter-apk/app-release.apk
       - uses: actions/upload-artifact@v4
         if: env.HAS_SIGNING_KEY == 'true'
         with:
-          name: woo-manager-app-1.0.0-aab
+          name: woo-manager-app-1.0.1-aab
           path: build/app/outputs/bundle/release/app-release.aab
       - uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
