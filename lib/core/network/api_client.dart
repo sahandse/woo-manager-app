@@ -24,6 +24,7 @@ class ApiClient {
   Future<Map<String, dynamic>> products({String search = '', int page = 1}) async => Map<String, dynamic>.from((await _dio.get('/products', queryParameters: {'search': search, 'page': page, 'limit': 30})).data as Map);
   Future<Map<String, dynamic>> product(int productId) async => Map<String, dynamic>.from((await _dio.get('/products/$productId')).data as Map);
   Future<Map<String, dynamic>> updateProduct(int productId, Map<String, dynamic> data) async => Map<String, dynamic>.from((await _dio.patch('/products/$productId', data: data)).data as Map);
+  Future<Map<String, dynamic>> updateVariation(int productId, int variationId, Map<String, dynamic> data) async => Map<String, dynamic>.from((await _dio.patch('/products/$productId/variations/$variationId', data: data)).data as Map);
   Future<Map<String, dynamic>> registerShipment(int orderId, Map<String, dynamic> options) async => Map<String, dynamic>.from((await _dio.post('/tapin/register/$orderId', data: options)).data as Map);
   Future<Map<String, dynamic>> shipmentPdf(List<String> ids, {required String type}) async => Map<String, dynamic>.from((await _dio.post('/tapin/pdf', data: {'ids': ids, 'type': type})).data as Map);
 }
