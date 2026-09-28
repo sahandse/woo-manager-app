@@ -1,0 +1,74 @@
+name: Android Release
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Create Android project
+        run: flutter create --platforms=android --org=ir.sahand.woomanager --project-name=woo_manager_app .
+      - name: Configure Android release
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          manifest=Path('android/app/src/main/AndroidManifest.xml')
+          text=manifest.read_text()
+          permissions='    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.CAMERA" />\n'
+          text=text.replace('    <application',permissions+'    <application',1).replace('android:label="woo_manager_app"','android:label="مدیر فروشگاه"')
+          manifest.write_text(text)
+          PY
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            printf '%s' "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
+            printf 'storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=upload-keystore.jks\n' "$KEYSTORE_PASSWORD" "$KEY_PASSWORD" "$KEY_ALIAS" > android/key.properties
+            python3 - <<'PY'
+          from pathlib import Path
+          path=Path('android/app/build.gradle.kts')
+          text=path.read_text()
+          text='import java.util.Properties\nimport java.io.FileInputStream\n'+text
+          marker='android {'
+          setup='''val keystoreProperties = Properties()\nval keystorePropertiesFile = rootProject.file("key.properties")\nif (keystorePropertiesFile.exists()) {\n    keystoreProperties.load(FileInputStream(keystorePropertiesFile))\n}\n\n'''
+          text=text.replace(marker,setup+marker,1)
+          signing='''    signingConfigs {\n        create("release") {\n            keyAlias = keystoreProperties["keyAlias"] as String\n            keyPassword = keystoreProperties["keyPassword"] as String\n            storeFile = file(keystoreProperties["storeFile"] as String)\n            storePassword = keystoreProperties["storePassword"] as String\n        }\n    }\n'''
+          text=text.replace('    buildTypes {',signing+'    buildTypes {',1)
+          text=text.replace('signingConfig = signingConfigs.getByName("debug")','signingConfig = signingConfigs.getByName("release")')
+          path.write_text(text)
+          PY
+          fi
+      - run: flutter pub get
+      - run: dart format lib test
+      - run: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - run: flutter test
+      - run: flutter build apk --release
+      - name: Build signed app bundle
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        run: flutter build appbundle --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: woo-manager-app-1.0.0-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+      - uses: actions/upload-artifact@v4
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        with:
+          name: woo-manager-app-1.0.0-aab
+          path: build/app/outputs/bundle/release/app-release.aab
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/bundle/release/app-release.aab
+          generate_release_notes: true
