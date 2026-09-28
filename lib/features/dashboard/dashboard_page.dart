@@ -5,6 +5,7 @@ import '../../core/network/api_client.dart';
 import '../orders/order_detail_page.dart';
 import '../products/products_page.dart';
 import '../customers/customers_page.dart';
+import '../operations/operations_page.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key, required this.storeName, required this.client});
@@ -18,7 +19,7 @@ class _DashboardPageState extends State<DashboardPage>{ late Future<List<dynamic
   Future<void> _registerSelected()async{setState(()=>batchBusy=true);final failures=<String>[];for(final item in visibleOrders.where((o)=>selected.contains((o['id'] as num).toInt())&&o['tapin_order_id']==null)){try{await widget.client.registerShipment((item['id'] as num).toInt(),{});}catch(e){failures.add('#${item['id']}: $e');}}if(!mounted){return;}setState((){batchBusy=false;selected.clear();orders=widget.client.orders();});ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(failures.isEmpty?'مرسوله‌های انتخابی با موفقیت ثبت شدند.':'برخی سفارش‌ها ثبت نشدند:\n${failures.join('\n')}')));}
   Future<void> _printSelected(String type)async{final key=type=='label'?'tapin_uuid':'tapin_order_id';final ids=visibleOrders.where((o)=>selected.contains((o['id'] as num).toInt())&&o[key]!=null).map((o)=>o[key].toString()).toList();if(ids.isEmpty){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('سفارش انتخابی دارای مرسوله ثبت‌شده نیست.')));return;}setState(()=>batchBusy=true);try{await _print(ids,type);}finally{if(mounted){setState(()=>batchBusy=false);}}}
   @override Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(widget.storeName),actions:[IconButton(onPressed:_refresh,icon:const Icon(Icons.refresh_rounded))]),
+    appBar: AppBar(title: Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(widget.storeName),Text('مدیریت فروشگاه',style:Theme.of(context).textTheme.bodySmall)]),actions:[IconButton(tooltip:'مرکز مدیریت',onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>OperationsPage(client:widget.client))),icon:const Icon(Icons.notifications_none_rounded)),IconButton(onPressed:_refresh,icon:const Icon(Icons.refresh_rounded))]),
     body: FutureBuilder<List<dynamic>>(future:orders,builder:(context,snapshot){if(snapshot.connectionState!=ConnectionState.done){return const Center(child:CircularProgressIndicator());}if(snapshot.hasError){return _Error(message:snapshot.error.toString(),retry:()=>setState(()=>orders=widget.client.orders()));}final list=snapshot.data??[];visibleOrders=list;final processing=list.where((o)=>o['status']=='processing').length;return ListView(padding:const EdgeInsets.all(16),children:[
       Text('مرکز عملیات',style:Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight:FontWeight.w800)),const SizedBox(height:12),
       SegmentedButton<int>(segments:const [ButtonSegment(value:7,label:Text('۷ روز')),ButtonSegment(value:30,label:Text('۳۰ روز')),ButtonSegment(value:90,label:Text('۹۰ روز'))],selected:{reportDays},onSelectionChanged:(value)=>_setDays(value.first)),const SizedBox(height:12),
