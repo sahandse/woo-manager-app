@@ -8,6 +8,8 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      HAS_SIGNING_KEY: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -54,14 +56,14 @@ jobs:
       - run: flutter test
       - run: flutter build apk --release
       - name: Build signed app bundle
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        if: env.HAS_SIGNING_KEY == 'true'
         run: flutter build appbundle --release
       - uses: actions/upload-artifact@v4
         with:
           name: woo-manager-app-1.0.0-apk
           path: build/app/outputs/flutter-apk/app-release.apk
       - uses: actions/upload-artifact@v4
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        if: env.HAS_SIGNING_KEY == 'true'
         with:
           name: woo-manager-app-1.0.0-aab
           path: build/app/outputs/bundle/release/app-release.aab
