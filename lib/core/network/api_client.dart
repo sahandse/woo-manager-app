@@ -11,6 +11,16 @@ class ApiClient {
   }
   Future<Map<String, dynamic>> health() async => Map<String, dynamic>.from((await _dio.get('/health')).data as Map);
   Future<List<dynamic>> orders() async => (await _dio.get('/orders')).data as List<dynamic>;
+  Future<Map<String, dynamic>> order(int orderId) async => Map<String, dynamic>.from((await _dio.get('/orders/$orderId')).data as Map);
+  Future<Map<String, dynamic>> updateOrderStatus(int orderId, String status) async => Map<String, dynamic>.from((await _dio.patch('/orders/$orderId', data: {'status': status})).data as Map);
+  Future<Map<String, dynamic>> addOrderNote(int orderId, String content, {bool customerNote = false}) async {
+    final response = await _dio.post('/orders/$orderId/notes', data: {'content': content, 'customer_note': customerNote});
+    return Map<String, dynamic>.from((response.data as Map)['order'] as Map);
+  }
+  Future<Map<String, dynamic>> refundOrder(int orderId, {required double amount, required String reason, required bool refundPayment, required bool restockItems}) async {
+    final response = await _dio.post('/orders/$orderId/refunds', data: {'amount': amount, 'reason': reason, 'refund_payment': refundPayment, 'restock_items': restockItems, 'confirm': true});
+    return Map<String, dynamic>.from((response.data as Map)['order'] as Map);
+  }
   Future<Map<String, dynamic>> registerShipment(int orderId, Map<String, dynamic> options) async => Map<String, dynamic>.from((await _dio.post('/tapin/register/$orderId', data: options)).data as Map);
   Future<Map<String, dynamic>> shipmentPdf(List<String> ids, {required String type}) async => Map<String, dynamic>.from((await _dio.post('/tapin/pdf', data: {'ids': ids, 'type': type})).data as Map);
 }
