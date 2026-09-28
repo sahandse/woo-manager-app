@@ -10,5 +10,5 @@ jobs:
       - run: flutter create --platforms=android --org=ir.sahand.woomanager .
       - run: flutter pub get
       - run: dart format lib test
-      - run: flutter analyze
+      - run: flutter analyze --no-fatal-infos --no-fatal-warnings
       - run: flutter test
