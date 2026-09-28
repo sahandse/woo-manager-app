@@ -53,10 +53,8 @@ jobs:
           path.write_text(text)
           PY
           fi
-          for pair in "mdpi:48" "hdpi:72" "xhdpi:96" "xxhdpi:144" "xxxhdpi:192"; do
-            density="${pair%%:*}"
-            size="${pair##*:}"
-            convert assets/woo_manager_logo.png -resize "${size}x${size}" "android/app/src/main/res/mipmap-${density}/ic_launcher.png"
+          for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            cp assets/woo_manager_logo.png "android/app/src/main/res/mipmap-${density}/ic_launcher.png"
           done
       - run: flutter pub get
       - run: dart format lib test
