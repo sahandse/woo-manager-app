@@ -45,6 +45,10 @@ class ApiClient {
   Future<Map<String, dynamic>> uploadMedia(Map<String, dynamic> data) async => Map<String, dynamic>.from((await _dio.post('/media', data: data)).data as Map);
   Future<List<dynamic>> content(String type) async => (await _dio.get('/content', queryParameters: {'type': type})).data as List<dynamic>;
   Future<Map<String, dynamic>> updateContent(int id, Map<String, dynamic> data) async => Map<String, dynamic>.from((await _dio.patch('/content/$id', data: data)).data as Map);
+  Future<Map<String, dynamic>> exportSales(int days, String format) async => Map<String, dynamic>.from((await _dio.post('/exports/sales', data: {'days': days, 'format': format})).data as Map);
+  Future<Map<String, dynamic>> backup() async => Map<String, dynamic>.from((await _dio.post('/backup')).data as Map);
+  Future<Map<String, dynamic>> restoreBackup(String contentBase64) async => Map<String, dynamic>.from((await _dio.post('/restore', data: {'content_base64': contentBase64, 'confirm': true})).data as Map);
+  Future<Map<String, dynamic>> maintenance() async => Map<String, dynamic>.from((await _dio.get('/maintenance')).data as Map);
   Future<Map<String, dynamic>> registerShipment(int orderId, Map<String, dynamic> options) async => Map<String, dynamic>.from((await _dio.post('/tapin/register/$orderId', data: options)).data as Map);
   Future<Map<String, dynamic>> shipmentPdf(List<String> ids, {required String type}) async => Map<String, dynamic>.from((await _dio.post('/tapin/pdf', data: {'ids': ids, 'type': type})).data as Map);
 }
