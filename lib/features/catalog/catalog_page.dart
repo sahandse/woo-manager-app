@@ -1,0 +1,48 @@
+import 'package:flutter/material.dart';
+import '../../core/network/api_client.dart';
+
+class CatalogPage extends StatefulWidget {
+  const CatalogPage({super.key, required this.client});
+  final ApiClient client;
+  @override State<CatalogPage> createState() => _CatalogPageState();
+}
+
+class _CatalogPageState extends State<CatalogPage> with SingleTickerProviderStateMixin {
+  late final TabController _tabs;
+  late Future<List<dynamic>> _categories;
+  late Future<Map<String, dynamic>> _products;
+  final Set<int> _selected = {};
+  bool _busy = false;
+
+  @override void initState(){super.initState();_tabs=TabController(length:2,vsync:this);_reload();}
+  @override void dispose(){_tabs.dispose();super.dispose();}
+  void _reload(){_categories=widget.client.categories();_products=widget.client.products();}
+
+  Future<void> _category([Map<String,dynamic>? item]) async {
+    final name=TextEditingController(text:'${item?['name']??''}');
+    final description=TextEditingController(text:'${item?['description']??''}');
+    final all=await _categories;
+    int parent=(item?['parent'] as num?)?.toInt()??0;
+    if(!mounted)return;
+    final save=await showDialog<bool>(context:context,builder:(context)=>StatefulBuilder(builder:(context,setModal)=>AlertDialog(title:Text(item==null?'دسته‌بندی جدید':'ویرایش دسته‌بندی'),content:SizedBox(width:420,child:Column(mainAxisSize:MainAxisSize.min,children:[TextField(controller:name,decoration:const InputDecoration(labelText:'نام دسته‌بندی')),const SizedBox(height:12),DropdownButtonFormField<int>(value:parent,decoration:const InputDecoration(labelText:'دسته مادر'),items:[const DropdownMenuItem(value:0,child:Text('بدون دسته مادر')),...all.where((e)=>item==null||e['id']!=item['id']).map((e)=>DropdownMenuItem<int>(value:(e['id'] as num).toInt(),child:Text('${e['name']}')))],onChanged:(v)=>setModal(()=>parent=v??0)),const SizedBox(height:12),TextField(controller:description,minLines:2,maxLines:4,decoration:const InputDecoration(labelText:'توضیحات'))])),actions:[TextButton(onPressed:()=>Navigator.pop(context,false),child:const Text('انصراف')),FilledButton(onPressed:()=>Navigator.pop(context,true),child:const Text('ذخیره در ووکامرس'))])));
+    if(save==true&&name.text.trim().isNotEmpty){setState(()=>_busy=true);try{final data={'name':name.text.trim(),'description':description.text.trim(),'parent':parent};if(item==null){await widget.client.createCategory(data);}else{await widget.client.updateCategory((item['id'] as num).toInt(),data);}if(mounted){setState((){_categories=widget.client.categories();});ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('دسته‌بندی ذخیره شد.')));}}catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('ذخیره انجام نشد: $e')));}finally{if(mounted)setState(()=>_busy=false);}}
+    name.dispose();description.dispose();
+  }
+
+  Future<void> _bulk() async {
+    if(_selected.isEmpty)return;
+    final percent=TextEditingController(),quantity=TextEditingController();
+    String? stockStatus;bool changePrice=false,changeQuantity=false,changeStatus=false;
+    final confirmed=await showDialog<bool>(context:context,builder:(context)=>StatefulBuilder(builder:(context,setModal)=>AlertDialog(title:Text('ویرایش ${_selected.length} محصول'),content:SizedBox(width:440,child:Column(mainAxisSize:MainAxisSize.min,children:[CheckboxListTile(contentPadding:EdgeInsets.zero,value:changePrice,onChanged:(v)=>setModal(()=>changePrice=v??false),title:const Text('تغییر درصدی قیمت اصلی')),if(changePrice)TextField(controller:percent,keyboardType:const TextInputType.numberWithOptions(signed:true,decimal:true),decoration:const InputDecoration(labelText:'درصد؛ مثبت افزایش و منفی کاهش')),CheckboxListTile(contentPadding:EdgeInsets.zero,value:changeQuantity,onChanged:(v)=>setModal(()=>changeQuantity=v??false),title:const Text('تنظیم تعداد موجودی')),if(changeQuantity)TextField(controller:quantity,keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'تعداد موجودی')),CheckboxListTile(contentPadding:EdgeInsets.zero,value:changeStatus,onChanged:(v)=>setModal(()=>changeStatus=v??false),title:const Text('تغییر وضعیت موجودی')),if(changeStatus)DropdownButtonFormField<String>(value:stockStatus,decoration:const InputDecoration(labelText:'وضعیت'),items:const [DropdownMenuItem(value:'instock',child:Text('موجود')),DropdownMenuItem(value:'outofstock',child:Text('ناموجود')),DropdownMenuItem(value:'onbackorder',child:Text('پیش‌خرید'))],onChanged:(v)=>setModal(()=>stockStatus=v)),const SizedBox(height:12),const Text('این تغییر مستقیم روی محصولات واقعی ووکامرس اعمال می‌شود.') ])),actions:[TextButton(onPressed:()=>Navigator.pop(context,false),child:const Text('انصراف')),FilledButton(onPressed:(!changePrice&&!changeQuantity&&!changeStatus)||(changeStatus&&stockStatus==null)?null:()=>Navigator.pop(context,true),child:const Text('تأیید و اجرا'))])));
+    if(confirmed==true){final changes=<String,dynamic>{};if(changePrice)changes['price_percent']=double.tryParse(percent.text.trim())??0;if(changeQuantity)changes['stock_quantity']=int.tryParse(quantity.text.trim())??0;if(changeStatus)changes['stock_status']=stockStatus;setState(()=>_busy=true);try{final result=await widget.client.bulkProducts(_selected.toList(),changes);final updated=(result['updated'] as List? ?? const []).length,failed=(result['failed'] as List? ?? const []).length;if(mounted){setState((){_selected.clear();_products=widget.client.products();});ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('$updated محصول به‌روزرسانی شد${failed>0?'؛ $failed مورد ناموفق بود.':''}')));}}catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('عملیات انجام نشد: $e')));}finally{if(mounted)setState(()=>_busy=false);}}
+    percent.dispose();quantity.dispose();
+  }
+
+  @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('مدیریت کاتالوگ'),bottom:TabBar(controller:_tabs,tabs:const [Tab(text:'دسته‌بندی‌ها',icon:Icon(Icons.category_outlined)),Tab(text:'ویرایش گروهی',icon:Icon(Icons.library_add_check_outlined))])),floatingActionButton:AnimatedBuilder(animation:_tabs,builder:(context,_)=>_tabs.index==0?FloatingActionButton.extended(onPressed:_busy?null:()=>_category(),icon:const Icon(Icons.add_rounded),label:const Text('دسته جدید')):const SizedBox.shrink()),body:Stack(children:[TabBarView(controller:_tabs,children:[_categoryList(),_bulkList()]),if(_busy)const LinearProgressIndicator()]));
+
+  Widget _categoryList()=>FutureBuilder<List<dynamic>>(future:_categories,builder:(context,snapshot){if(snapshot.connectionState!=ConnectionState.done)return const Center(child:CircularProgressIndicator());if(snapshot.hasError)return _retry();final items=snapshot.data??const [];if(items.isEmpty)return const Center(child:Text('هنوز دسته‌بندی‌ای در ووکامرس ثبت نشده است.'));return RefreshIndicator(onRefresh:()async=>setState(()=>_categories=widget.client.categories()),child:ListView.builder(padding:const EdgeInsets.all(16),itemCount:items.length,itemBuilder:(context,index){final c=Map<String,dynamic>.from(items[index] as Map);return Card(child:ListTile(onTap:_busy?null:()=>_category(c),leading:CircleAvatar(child:c['image']==null?const Icon(Icons.category_outlined):ClipOval(child:Image.network('${c['image']}',width:40,height:40,fit:BoxFit.cover))),title:Text('${c['name']}'),subtitle:Text('${c['count']} محصول${(c['description']??'').toString().isEmpty?'':'  •  ${c['description']}'}',maxLines:2,overflow:TextOverflow.ellipsis),trailing:const Icon(Icons.edit_outlined)));}));});
+
+  Widget _bulkList()=>FutureBuilder<Map<String,dynamic>>(future:_products,builder:(context,snapshot){if(snapshot.connectionState!=ConnectionState.done)return const Center(child:CircularProgressIndicator());if(snapshot.hasError)return _retry();final items=snapshot.data?['items'] as List? ?? const [];return Column(children:[Padding(padding:const EdgeInsets.fromLTRB(16,16,16,8),child:Row(children:[Expanded(child:Text('${_selected.length} محصول انتخاب شده',style:Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight:FontWeight.w700))),TextButton(onPressed:items.isEmpty?null:()=>setState(()=>_selected.length==items.length?_selected.clear():_selected.addAll(items.map((e)=>(e['id'] as num).toInt()))),child:Text(_selected.length==items.length?'لغو انتخاب':'انتخاب همه'))])),Expanded(child:items.isEmpty?const Center(child:Text('محصولی پیدا نشد.')):ListView.builder(padding:const EdgeInsets.symmetric(horizontal:16),itemCount:items.length,itemBuilder:(context,index){final p=Map<String,dynamic>.from(items[index] as Map),id=(p['id'] as num).toInt();return Card(child:CheckboxListTile(value:_selected.contains(id),onChanged:_busy?null:(v)=>setState(()=>v==true?_selected.add(id):_selected.remove(id)),secondary:p['image']==null?const Icon(Icons.inventory_2_outlined):ClipRRect(borderRadius:BorderRadius.circular(8),child:Image.network('${p['image']}',width:44,height:44,fit:BoxFit.cover)),title:Text('${p['name']}',maxLines:2,overflow:TextOverflow.ellipsis),subtitle:Text('${p['price'].toString().isEmpty?'بدون قیمت':p['price']} • ${_stock(p['stock_status'])}')));})),SafeArea(minimum:const EdgeInsets.all(16),child:SizedBox(width:double.infinity,child:FilledButton.icon(onPressed:_selected.isEmpty||_busy?null:_bulk,icon:const Icon(Icons.done_all_rounded),label:const Text('ویرایش محصولات انتخاب‌شده'))))]);});
+  Widget _retry()=>Center(child:FilledButton.icon(onPressed:()=>setState(_reload),icon:const Icon(Icons.refresh_rounded),label:const Text('تلاش دوباره')));
+  String _stock(dynamic value)=>value=='instock'?'موجود':value=='onbackorder'?'پیش‌خرید':'ناموجود';
+}
