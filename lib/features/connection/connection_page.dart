@@ -35,7 +35,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     body: SafeArea(child: Center(child: SingleChildScrollView(padding: const EdgeInsets.all(24), child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 460), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Container(width: 64,height: 64,decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary,borderRadius: BorderRadius.circular(20)),child: const Icon(Icons.storefront_rounded,color: Colors.white,size: 32)),
+      Center(child:ClipRRect(borderRadius:BorderRadius.circular(24),child:Image.asset('assets/woo_manager_logo.png',width:88,height:88,fit:BoxFit.cover))),
       const SizedBox(height: 28), Text('فروشگاهت همیشه همراهته',style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800)),
       const SizedBox(height: 8), Text('برای اتصال امن، آدرس سایت و کد یک‌بارمصرف ساخته‌شده در افزونه را وارد کن.',style: Theme.of(context).textTheme.bodyLarge),
       const SizedBox(height: 28), TextField(controller: site,keyboardType: TextInputType.url,textDirection: TextDirection.ltr,decoration: const InputDecoration(labelText:'آدرس فروشگاه',hintText:'https://example.com',prefixIcon:Icon(Icons.language_rounded))),
