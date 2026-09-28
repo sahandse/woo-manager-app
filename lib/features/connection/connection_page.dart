@@ -23,10 +23,11 @@ class _ConnectionPageState extends State<ConnectionPage> {
     await storage.write(key: 'device_id', value: id); return id;
   }
   Future<void> _connect() async {
-    final url=site.text.trim(); if(Uri.tryParse(url)?.hasAbsolutePath!=true || code.text.trim().length!=6){setState(()=>error='آدرس معتبر و کد شش‌رقمی را وارد کنید.');return;}
+    final url=site.text.trim().replaceAll(RegExp(r'/$'),'');final uri=Uri.tryParse(url);final secure=uri?.scheme=='https'||(uri?.scheme=='http'&&(uri?.host=='localhost'||uri?.host=='127.0.0.1'));if(uri==null||!uri.hasScheme||uri.host.isEmpty||!secure||code.text.trim().length!=6){setState(()=>error='آدرس HTTPS معتبر و کد شش‌رقمی را وارد کنید.');return;}
     setState((){loading=true;error=null;});
-    try { final result=await ApiClient.pair(url,code.text.trim(),await _deviceId()); final token=result['token'] as String; await storage.write(key:'site_url',value:url); await storage.write(key:'token',value:token); if(!mounted)return; Navigator.of(context).pushReplacement(MaterialPageRoute(builder:(_)=>DashboardPage(storeName:(result['site_name']??Uri.parse(url).host).toString(),client:ApiClient(url,token)))); }
+    try { final result=await ApiClient.pair(url,code.text.trim(),await _deviceId());if(result['api_version']!=1)throw const FormatException();final token=result['token'] as String,storeName=(result['site_name']??Uri.parse(url).host).toString(); await storage.write(key:'site_url',value:url); await storage.write(key:'token',value:token);await storage.write(key:'store_name',value:storeName); if(!mounted)return; Navigator.of(context).pushReplacement(MaterialPageRoute(builder:(_)=>DashboardPage(storeName:storeName,client:ApiClient(url,token)))); }
     on DioException catch(e){setState(()=>error=(e.response?.data is Map?(e.response?.data['message']??'خطا در اتصال'): 'ارتباط با سایت برقرار نشد.').toString());}
+    on FormatException{setState(()=>error='نسخه افزونه با اپ سازگار نیست؛ افزونه Woo Manager ۱.۰.۰ را نصب کن.');}
     catch(_){setState(()=>error='اتصال انجام نشد. تنظیمات افزونه و اینترنت را بررسی کنید.');}
     finally{if(mounted)setState(()=>loading=false);}
   }
