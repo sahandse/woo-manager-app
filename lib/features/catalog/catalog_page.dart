@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/network/api_client.dart';
+import 'taxonomies_page.dart';
 
 class CatalogPage extends StatefulWidget {
   const CatalogPage({super.key, required this.client});
@@ -38,7 +39,7 @@ class _CatalogPageState extends State<CatalogPage> with SingleTickerProviderStat
     percent.dispose();quantity.dispose();
   }
 
-  @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('مدیریت کاتالوگ'),bottom:TabBar(controller:_tabs,tabs:const [Tab(text:'دسته‌بندی‌ها',icon:Icon(Icons.category_outlined)),Tab(text:'ویرایش گروهی',icon:Icon(Icons.library_add_check_outlined))])),floatingActionButton:AnimatedBuilder(animation:_tabs,builder:(context,_)=>_tabs.index==0?FloatingActionButton.extended(onPressed:_busy?null:()=>_category(),icon:const Icon(Icons.add_rounded),label:const Text('دسته جدید')):const SizedBox.shrink()),body:Stack(children:[TabBarView(controller:_tabs,children:[_categoryList(),_bulkList()]),if(_busy)const LinearProgressIndicator()]));
+  @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('مدیریت کاتالوگ'),actions:[IconButton(tooltip:'ویژگی‌ها و برندها',onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>TaxonomiesPage(client:widget.client))),icon:const Icon(Icons.style_outlined))],bottom:TabBar(controller:_tabs,tabs:const [Tab(text:'دسته‌بندی‌ها',icon:Icon(Icons.category_outlined)),Tab(text:'ویرایش گروهی',icon:Icon(Icons.library_add_check_outlined))])),floatingActionButton:AnimatedBuilder(animation:_tabs,builder:(context,_)=>_tabs.index==0?FloatingActionButton.extended(onPressed:_busy?null:()=>_category(),icon:const Icon(Icons.add_rounded),label:const Text('دسته جدید')):const SizedBox.shrink()),body:Stack(children:[TabBarView(controller:_tabs,children:[_categoryList(),_bulkList()]),if(_busy)const LinearProgressIndicator()]));
 
   Widget _categoryList()=>FutureBuilder<List<dynamic>>(future:_categories,builder:(context,snapshot){if(snapshot.connectionState!=ConnectionState.done)return const Center(child:CircularProgressIndicator());if(snapshot.hasError)return _retry();final items=snapshot.data??const [];if(items.isEmpty)return const Center(child:Text('هنوز دسته‌بندی‌ای در ووکامرس ثبت نشده است.'));return RefreshIndicator(onRefresh:()async=>setState(()=>_categories=widget.client.categories()),child:ListView.builder(padding:const EdgeInsets.all(16),itemCount:items.length,itemBuilder:(context,index){final c=Map<String,dynamic>.from(items[index] as Map);return Card(child:ListTile(onTap:_busy?null:()=>_category(c),leading:CircleAvatar(child:c['image']==null?const Icon(Icons.category_outlined):ClipOval(child:Image.network('${c['image']}',width:40,height:40,fit:BoxFit.cover))),title:Text('${c['name']}'),subtitle:Text('${c['count']} محصول${(c['description']??'').toString().isEmpty?'':'  •  ${c['description']}'}',maxLines:2,overflow:TextOverflow.ellipsis),trailing:const Icon(Icons.edit_outlined)));}));});
 
