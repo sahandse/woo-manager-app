@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'core/theme/app_theme.dart';
-import 'features/connection/connection_page.dart';
+import 'features/connection/bootstrap_page.dart';
 
 void main() => runApp(const WooManagerApp());
 
@@ -15,6 +15,6 @@ class WooManagerApp extends StatelessWidget {
         themeMode: ThemeMode.system,
         locale: const Locale('fa'),
         builder: (context, child) => Directionality(textDirection: TextDirection.rtl, child: child!),
-        home: const ConnectionPage(),
+        home: const BootstrapPage(),
       );
 }
