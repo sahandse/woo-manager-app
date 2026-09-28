@@ -7,6 +7,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with: { channel: stable, cache: true }
+      - name: Prepare brand assets
+        run: base64 --decode assets/woo_manager_logo.png.b64 > assets/woo_manager_logo.png
       - run: flutter create --platforms=android --org=ir.sahand.woomanager .
       - run: flutter pub get
       - run: dart format lib test
