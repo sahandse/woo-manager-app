@@ -1,7 +1,7 @@
 name: woo_manager_app
 description: اپ فارسی مدیریت فروشگاه ووکامرس
 publish_to: none
-version: 0.1.0+1
+version: 1.0.0+100
 environment:
   sdk: '>=3.4.0 <4.0.0'
 dependencies:
