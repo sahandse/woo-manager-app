@@ -65,4 +65,20 @@ class ApiClient {
   Future<Map<String, dynamic>> maintenance() async => Map<String, dynamic>.from((await _dio.get('/maintenance')).data as Map);
   Future<Map<String, dynamic>> registerShipment(int orderId, Map<String, dynamic> options) async => Map<String, dynamic>.from((await _dio.post('/tapin/register/$orderId', data: options)).data as Map);
   Future<Map<String, dynamic>> shipmentPdf(List<String> ids, {required String type}) async => Map<String, dynamic>.from((await _dio.post('/tapin/pdf', data: {'ids': ids, 'type': type})).data as Map);
+  Future<Map<String, dynamic>> events({int since = 0}) async => Map<String, dynamic>.from((await _dio.get('/events', queryParameters: {'since': since})).data as Map);
+  Future<Map<String, dynamic>> packing(int orderId) async => Map<String, dynamic>.from((await _dio.get('/packing/$orderId')).data as Map);
+  Future<Map<String, dynamic>> scanPacking(int orderId, String code) async => Map<String, dynamic>.from((await _dio.post('/packing/$orderId/scan', data: {'code': code})).data as Map);
+  Future<Map<String, dynamic>> completePacking(int orderId) async => Map<String, dynamic>.from((await _dio.post('/packing/$orderId/complete')).data as Map);
+  Future<List<dynamic>> returns() async => (await _dio.get('/returns')).data as List<dynamic>;
+  Future<Map<String, dynamic>> createReturn(Map<String, dynamic> data) async => Map<String, dynamic>.from((await _dio.post('/returns', data: data)).data as Map);
+  Future<Map<String, dynamic>> updateReturn(int id, String status, {String? resolution}) async => Map<String, dynamic>.from((await _dio.patch('/returns/$id', data: {'status': status, if (resolution != null) 'resolution': resolution})).data as Map);
+  Future<Map<String, dynamic>> tapinQuote(int orderId, Map<String, dynamic> options) async => Map<String, dynamic>.from((await _dio.post('/tapin/quote/$orderId', data: options)).data as Map);
+  Future<Map<String, dynamic>> thermalPdf(List<String> ids) async => Map<String, dynamic>.from((await _dio.post('/tapin/thermal', data: {'ids': ids})).data as Map);
+  Future<Map<String, dynamic>> retryQueue({bool retry = false}) async => Map<String, dynamic>.from((retry ? await _dio.post('/retry-queue') : await _dio.get('/retry-queue')).data as Map);
+  Future<Map<String, dynamic>> profit({int days = 30}) async => Map<String, dynamic>.from((await _dio.get('/reports/profit', queryParameters: {'days': days})).data as Map);
+  Future<List<dynamic>> team() async => (await _dio.get('/team')).data as List<dynamic>;
+  Future<List<dynamic>> audit() async => (await _dio.get('/audit', queryParameters: {'limit': 200})).data as List<dynamic>;
+  Future<Map<String, dynamic>> preferences() async => Map<String, dynamic>.from((await _dio.get('/preferences')).data as Map);
+  Future<Map<String, dynamic>> savePreferences(Map<String, dynamic> data) async => Map<String, dynamic>.from((await _dio.patch('/preferences', data: data)).data as Map);
+  Future<Map<String, dynamic>> releaseInfo() async => Map<String, dynamic>.from((await _dio.get('/release')).data as Map);
 }
