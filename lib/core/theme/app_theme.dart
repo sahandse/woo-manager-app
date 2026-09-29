@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 abstract final class AppTheme {
-  static const seed = Color(0xFF111827);
+  static const seed = Color(0xFF087F5B);
   static ThemeData get light => _build(Brightness.light);
   static ThemeData get dark => _build(Brightness.dark);
   static ThemeData _build(Brightness brightness) {
@@ -11,7 +11,7 @@ abstract final class AppTheme {
     return ThemeData(
       useMaterial3: true,
       colorScheme: colors,
-      scaffoldBackgroundColor: dark ? const Color(0xFF08080A) : const Color(0xFFF5F5F4),
+      scaffoldBackgroundColor: dark ? const Color(0xFF08080A) : const Color(0xFFF7F8F8),
       textTheme: GoogleFonts.vazirmatnTextTheme(ThemeData(brightness: brightness).textTheme),
       appBarTheme: AppBarTheme(centerTitle:false,elevation:0,scrolledUnderElevation:0,backgroundColor:Colors.transparent,titleTextStyle:GoogleFonts.vazirmatn(fontSize:20,fontWeight:FontWeight.w800,color:dark?Colors.white:const Color(0xFF111113))),
       inputDecorationTheme: InputDecorationTheme(filled:true,fillColor:dark?const Color(0xFF18181B):Colors.white,contentPadding:const EdgeInsets.symmetric(horizontal:16,vertical:14),border:OutlineInputBorder(borderRadius:BorderRadius.circular(18),borderSide:BorderSide.none)),
