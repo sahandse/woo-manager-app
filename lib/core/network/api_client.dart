@@ -11,14 +11,19 @@ class ApiClient {
   }
   Future<Map<String, dynamic>> health() async => Map<String, dynamic>.from((await _dio.get('/health')).data as Map);
   Future<List<dynamic>> orders({int page = 1, int limit = 50, String status = ''}) async {
+    final result=await ordersResult(page:page,limit:limit,status:status);
+    return result['items'] as List<dynamic>;
+  }
+  Future<Map<String,dynamic>> ordersResult({int page = 1, int limit = 50, String status = ''}) async {
     final response = await _dio.get('/orders', queryParameters: {
       'page': page,
       'limit': limit,
+      'envelope': 1,
       if (status.isNotEmpty) 'status': status,
     });
     final data = response.data;
-    if (data is List) return data;
-    if (data is Map && data['items'] is List) return data['items'] as List<dynamic>;
+    if (data is List) return {'items':data,'total':data.length,'page':page,'pages':1};
+    if (data is Map && data['items'] is List) return Map<String,dynamic>.from(data);
     throw const FormatException('پاسخ سفارش‌ها از افزونه معتبر نیست. افزونه Woo Manager را به‌روزرسانی کنید.');
   }
   Future<Map<String, dynamic>> order(int orderId) async => Map<String, dynamic>.from((await _dio.get('/orders/$orderId')).data as Map);
