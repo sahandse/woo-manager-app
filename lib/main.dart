@@ -3,7 +3,11 @@ import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'features/connection/bootstrap_page.dart';
 
-void main() => runApp(const WooManagerApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await ThemeController.load();
+  runApp(const WooManagerApp());
+}
 
 class WooManagerApp extends StatelessWidget {
   const WooManagerApp({super.key});
