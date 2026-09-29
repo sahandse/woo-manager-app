@@ -13,6 +13,8 @@ jobs:
       HAS_SIGNING_KEY: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
     steps:
       - uses: actions/checkout@v4
+      - name: Apply reviewed 1.3.0 source overlay
+        run: unzip -o .github/workflows/release-source-overlay.zip
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -32,9 +34,12 @@ jobs:
           from pathlib import Path
           manifest=Path('android/app/src/main/AndroidManifest.xml')
           text=manifest.read_text()
-          permissions='    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.CAMERA" />\n'
+          permissions='    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.CAMERA" />\n    <uses-permission android:name="android.permission.USE_BIOMETRIC" />\n'
           text=text.replace('    <application',permissions+'    <application',1).replace('android:label="woo_manager_app"','android:label="مدیر فروشگاه"')
           manifest.write_text(text)
+          for activity in Path('android/app/src/main').rglob('MainActivity.kt'):
+              source=activity.read_text().replace('import io.flutter.embedding.android.FlutterActivity','import io.flutter.embedding.android.FlutterFragmentActivity').replace('FlutterActivity()','FlutterFragmentActivity()')
+              activity.write_text(source)
           PY
           if [ -n "$KEYSTORE_BASE64" ]; then
             printf '%s' "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
@@ -66,12 +71,12 @@ jobs:
         run: flutter build appbundle --release
       - uses: actions/upload-artifact@v4
         with:
-          name: woo-manager-app-1.2.1-apk
+          name: woo-manager-app-1.3.0-apk
           path: build/app/outputs/flutter-apk/app-release.apk
       - uses: actions/upload-artifact@v4
         if: env.HAS_SIGNING_KEY == 'true'
         with:
-          name: woo-manager-app-1.2.1-aab
+          name: woo-manager-app-1.3.0-aab
           path: build/app/outputs/bundle/release/app-release.aab
       - uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
