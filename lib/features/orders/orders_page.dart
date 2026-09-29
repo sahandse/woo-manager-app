@@ -14,8 +14,9 @@ class OrdersPage extends StatefulWidget {
 }
 
 class _OrdersPageState extends State<OrdersPage> {
-  late Future<List<dynamic>> _future;
+  late Future<Map<String, dynamic>> _future;
   String _status = '';
+  String _search = '';
 
   static const _statuses = <String, String>{
     '': 'همه',
@@ -34,7 +35,7 @@ class _OrdersPageState extends State<OrdersPage> {
     _load();
   }
 
-  void _load() => setState(() => _future = widget.client.orders(status: _status));
+  void _load() => setState(() => _future = widget.client.ordersResult(status: _status));
 
   String _error(Object error) {
     if (error is DioException) {
@@ -54,6 +55,13 @@ class _OrdersPageState extends State<OrdersPage> {
           actions: [IconButton(tooltip: 'به‌روزرسانی', onPressed: _load, icon: const Icon(Icons.refresh_rounded))],
         ),
         body: Column(children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: TextField(
+              onChanged: (value) => setState(() => _search = value.trim().toLowerCase()),
+              decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: 'جستجو با شماره سفارش یا نام مشتری'),
+            ),
+          ),
           SizedBox(
             height: 58,
             child: ListView(
@@ -77,7 +85,7 @@ class _OrdersPageState extends State<OrdersPage> {
           Expanded(
             child: RefreshIndicator(
               onRefresh: () async => _load(),
-              child: FutureBuilder<List<dynamic>>(
+              child: FutureBuilder<Map<String, dynamic>>(
                 future: _future,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState != ConnectionState.done) {
@@ -93,8 +101,10 @@ class _OrdersPageState extends State<OrdersPage> {
                       Center(child: FilledButton.icon(onPressed: _load, icon: const Icon(Icons.refresh_rounded), label: const Text('تلاش دوباره'))),
                     ]);
                   }
-                  final orders = snapshot.data ?? const [];
-                  if (orders.isEmpty) return const Center(child: Text('سفارشی در این وضعیت وجود ندارد.'));
+                  final result = snapshot.data ?? const <String,dynamic>{};
+                  final rawOrders = result['items'] as List? ?? const [];
+                  final orders = rawOrders.where((raw){final order=Map<String,dynamic>.from(raw as Map);if(_search.isEmpty)return true;return '${order['id']}'.contains(_search)||'${order['customer']??''}'.toLowerCase().contains(_search);}).toList();
+                  if (orders.isEmpty) return ListView(padding:const EdgeInsets.all(24),children:[const SizedBox(height:72),Icon(Icons.receipt_long_outlined,size:58,color:Theme.of(context).colorScheme.outline),const SizedBox(height:16),Text(_search.isNotEmpty?'سفارشی با این عبارت پیدا نشد.':_status.isNotEmpty?'سفارشی در این وضعیت وجود ندارد.':'هیچ سفارشی از ووکامرس دریافت نشد.',textAlign:TextAlign.center,style:Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight:FontWeight.w800)),const SizedBox(height:8),if(_search.isEmpty&&_status.isEmpty)Text('تعداد ثبت‌شده در فروشگاه: ${(result['store_total']??0).fa}\nنوع ذخیره‌سازی: ${result['storage']??'-'} • افزونه ${result['plugin_version']??'-'}',textAlign:TextAlign.center),const SizedBox(height:18),Center(child:FilledButton.icon(onPressed:_load,icon:const Icon(Icons.sync_rounded),label:const Text('دریافت دوباره از ووکامرس')))]);
                   return ListView.separated(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                     itemCount: orders.length,
