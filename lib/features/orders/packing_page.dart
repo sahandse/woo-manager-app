@@ -84,16 +84,18 @@ class _PackingPageState extends State<PackingPage>{
         const SizedBox(height:16),
         if(items.isEmpty)Card(child:Padding(padding:const EdgeInsets.all(20),child:Text('کالایی برای آماده‌سازی در این سفارش وجود ندارد.',textAlign:TextAlign.center,style:Theme.of(context).textTheme.titleMedium))),
         ...items.map((item){
-          final required=_int(item['required']),scanned=_int(item['scanned']).clamp(0,required);
+          final required=_int(item['required']);
+          final scanned=_int(item['scanned']).clamp(0,required).toInt();
           final ok=required>0&&scanned>=required;
           final meta=(item['meta'] as List? ?? const []).whereType<Map>();
           final sku='${item['sku']??''}'.trim();
+          final progress=required<=0?0.0:(scanned/required).clamp(0,1).toDouble();
           return Card(child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
             Row(children:[CircleAvatar(backgroundColor:(ok?Colors.green:Colors.orange).withValues(alpha:.12),child:Icon(ok?Icons.check_rounded:Icons.inventory_2_outlined,color:ok?Colors.green:Colors.orange)),const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('${item['name']??'کالا'}',style:const TextStyle(fontWeight:FontWeight.w800)),Text('SKU: ${sku.isEmpty?'—':sku}')]))]),
             const SizedBox(height:10),
             ...meta.map((m)=>Text('${m['key']??''}: ${m['value']??''}',style:Theme.of(context).textTheme.bodySmall)),
             const SizedBox(height:10),
-            LinearProgressIndicator(value:required<=0?0:(scanned/required).clamp(0,1)),
+            LinearProgressIndicator(value:progress),
             const SizedBox(height:6),
             Text('${scanned.fa} از ${required.fa} عدد',textAlign:TextAlign.left),
           ])));
