@@ -32,11 +32,13 @@ class ApiClient {
     final response = await _dio.post('/orders/$orderId/notes', data: {'content': content, 'customer_note': customerNote});
     return Map<String, dynamic>.from((response.data as Map)['order'] as Map);
   }
+  Future<Map<String, dynamic>> sendOrderMessage(int orderId, String message) async => Map<String, dynamic>.from((await _dio.post('/orders/$orderId/message', data: {'message': message})).data as Map);
   Future<Map<String, dynamic>> refundOrder(int orderId, {required double amount, required String reason, required bool refundPayment, required bool restockItems}) async {
     final response = await _dio.post('/orders/$orderId/refunds', data: {'amount': amount, 'reason': reason, 'refund_payment': refundPayment, 'restock_items': restockItems, 'confirm': true});
     return Map<String, dynamic>.from((response.data as Map)['order'] as Map);
   }
   Future<Map<String, dynamic>> products({String search = '', int page = 1}) async => Map<String, dynamic>.from((await _dio.get('/products', queryParameters: {'search': search, 'page': page, 'limit': 30})).data as Map);
+  Future<Map<String, dynamic>> createProduct(Map<String, dynamic> data) async => Map<String, dynamic>.from((await _dio.post('/products', data: data)).data as Map);
   Future<Map<String, dynamic>> product(int productId) async => Map<String, dynamic>.from((await _dio.get('/products/$productId')).data as Map);
   Future<Map<String, dynamic>> updateProduct(int productId, Map<String, dynamic> data) async => Map<String, dynamic>.from((await _dio.patch('/products/$productId', data: data)).data as Map);
   Future<Map<String, dynamic>> updateVariation(int productId, int variationId, Map<String, dynamic> data) async => Map<String, dynamic>.from((await _dio.patch('/products/$productId/variations/$variationId', data: data)).data as Map);
@@ -78,6 +80,7 @@ class ApiClient {
   Future<Map<String, dynamic>> backup() async => Map<String, dynamic>.from((await _dio.post('/backup')).data as Map);
   Future<Map<String, dynamic>> restoreBackup(String contentBase64) async => Map<String, dynamic>.from((await _dio.post('/restore', data: {'content_base64': contentBase64, 'confirm': true})).data as Map);
   Future<Map<String, dynamic>> maintenance() async => Map<String, dynamic>.from((await _dio.get('/maintenance')).data as Map);
+  Future<Map<String, dynamic>> tapinOptions(int orderId) async => Map<String, dynamic>.from((await _dio.get('/tapin/options/$orderId')).data as Map);
   Future<Map<String, dynamic>> registerShipment(int orderId, Map<String, dynamic> options) async => Map<String, dynamic>.from((await _dio.post('/tapin/register/$orderId', data: options)).data as Map);
   Future<Map<String, dynamic>> shipmentPdf(List<String> ids, {required String type}) async => Map<String, dynamic>.from((await _dio.post('/tapin/pdf', data: {'ids': ids, 'type': type})).data as Map);
   Future<Map<String, dynamic>> events({int since = 0}) async => Map<String, dynamic>.from((await _dio.get('/events', queryParameters: {'since': since})).data as Map);
