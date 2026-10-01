@@ -58,10 +58,14 @@ class _OrderShippingPageState extends State<OrderShippingPage> {
     weight.text = '${defaults['package_weight'] ?? 100}';
     province.text = '${defaults['province_code'] ?? ''}';
     city.text = '${defaults['city_code'] ?? ''}';
-    boxId.text = '${defaults['box_id'] ?? ''}';
-    payType = _int(defaults['pay_type'], 1);
-    orderType = _int(defaults['order_type'], 1);
-    contentType = _int(defaults['content_type'], 1);
+    final savedBox = _int(defaults['box_id']);
+    boxId.text = savedBox > 0 ? '$savedBox' : '';
+    final nextPay = _int(defaults['pay_type'], 1);
+    final nextOrder = _int(defaults['order_type'], 1);
+    final nextContent = _int(defaults['content_type'], 1);
+    payType = const {0, 1, 2, 3}.contains(nextPay) ? nextPay : 1;
+    orderType = const {0, 1}.contains(nextOrder) ? nextOrder : 1;
+    contentType = const {1, 2, 3, 4}.contains(nextContent) ? nextContent : 1;
   }
 
   Map<String, dynamic> _options() => {
