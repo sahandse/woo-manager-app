@@ -32,34 +32,61 @@ class _OrdersPageState extends State<OrdersPage> {
   @override
   void initState() {
     super.initState();
-    _load();
+    _future = widget.client.ordersResult();
   }
 
-  void _load() => setState(() => _future = widget.client.ordersResult(status: _status));
+  Future<void> _load() async {
+    final next = widget.client.ordersResult(status: _status);
+    setState(() => _future = next);
+    try {
+      await next;
+    } catch (_) {}
+  }
 
   String _error(Object error) {
     if (error is DioException) {
       final data = error.response?.data;
       if (data is Map && data['message'] != null) return '${data['message']}';
-      if (error.response?.statusCode == 401) return 'اتصال این دستگاه منقضی شده است. دوباره با کد یک‌بارمصرف متصل شوید.';
-      if (error.response?.statusCode == 404) return 'API سفارش‌ها پیدا نشد. افزونه Woo Manager را به نسخه جدید ارتقا دهید.';
+      final code = error.response?.statusCode;
+      if (code == 401 || code == 403) {
+        return 'دسترسی این دستگاه به فروشگاه معتبر نیست. دوباره اتصال اپ را برقرار کنید.';
+      }
+      if (code == 404) {
+        return 'API سفارش‌ها پیدا نشد. افزونه Woo Manager را به نسخه ۱.۲.۲ یا جدیدتر ارتقا دهید.';
+      }
+      if (code != null) return 'دریافت سفارش‌ها با خطای $code انجام نشد.';
       return 'ارتباط با فروشگاه برقرار نشد. اینترنت و آدرس سایت را بررسی کنید.';
     }
     return error.toString().replaceFirst('FormatException: ', '');
+  }
+
+  int? _orderId(Map<String, dynamic> order) {
+    final value = order['id'];
+    if (value is num) return value.toInt();
+    return int.tryParse('$value');
   }
 
   @override
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(
           title: const Text('سفارش‌ها'),
-          actions: [IconButton(tooltip: 'به‌روزرسانی', onPressed: _load, icon: const Icon(Icons.refresh_rounded))],
+          actions: [
+            IconButton(
+              tooltip: 'به‌روزرسانی',
+              onPressed: _load,
+              icon: const Icon(Icons.refresh_rounded),
+            ),
+          ],
         ),
         body: Column(children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: TextField(
               onChanged: (value) => setState(() => _search = value.trim().toLowerCase()),
-              decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: 'جستجو با شماره سفارش یا نام مشتری'),
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.search_rounded),
+                hintText: 'جستجو با شماره سفارش یا نام مشتری',
+              ),
             ),
           ),
           SizedBox(
@@ -84,7 +111,7 @@ class _OrdersPageState extends State<OrdersPage> {
           ),
           Expanded(
             child: RefreshIndicator(
-              onRefresh: () async => _load(),
+              onRefresh: _load,
               child: FutureBuilder<Map<String, dynamic>>(
                 future: _future,
                 builder: (context, snapshot) {
@@ -96,42 +123,118 @@ class _OrdersPageState extends State<OrdersPage> {
                       const SizedBox(height: 120),
                       Icon(Icons.cloud_off_rounded, size: 52, color: Theme.of(context).colorScheme.outline),
                       const SizedBox(height: 14),
-                      Padding(padding: const EdgeInsets.symmetric(horizontal: 32), child: Text(_error(snapshot.error!), textAlign: TextAlign.center)),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32),
+                        child: Text(_error(snapshot.error!), textAlign: TextAlign.center),
+                      ),
                       const SizedBox(height: 18),
-                      Center(child: FilledButton.icon(onPressed: _load, icon: const Icon(Icons.refresh_rounded), label: const Text('تلاش دوباره'))),
+                      Center(
+                        child: FilledButton.icon(
+                          onPressed: _load,
+                          icon: const Icon(Icons.refresh_rounded),
+                          label: const Text('تلاش دوباره'),
+                        ),
+                      ),
                     ]);
                   }
-                  final result = snapshot.data ?? const <String,dynamic>{};
-                  final rawOrders = result['items'] as List? ?? const [];
-                  final orders = rawOrders.where((raw){final order=Map<String,dynamic>.from(raw as Map);if(_search.isEmpty)return true;return '${order['id']}'.contains(_search)||'${order['customer']??''}'.toLowerCase().contains(_search);}).toList();
-                  if (orders.isEmpty) return ListView(padding:const EdgeInsets.all(24),children:[const SizedBox(height:72),Icon(Icons.receipt_long_outlined,size:58,color:Theme.of(context).colorScheme.outline),const SizedBox(height:16),Text(_search.isNotEmpty?'سفارشی با این عبارت پیدا نشد.':_status.isNotEmpty?'سفارشی در این وضعیت وجود ندارد.':'هیچ سفارشی از ووکامرس دریافت نشد.',textAlign:TextAlign.center,style:Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight:FontWeight.w800)),const SizedBox(height:8),if(_search.isEmpty&&_status.isEmpty)Text('تعداد ثبت‌شده در فروشگاه: ${(result['store_total']??0).fa}\nنوع ذخیره‌سازی: ${result['storage']??'-'} • افزونه ${result['plugin_version']??'-'}',textAlign:TextAlign.center),const SizedBox(height:18),Center(child:FilledButton.icon(onPressed:_load,icon:const Icon(Icons.sync_rounded),label:const Text('دریافت دوباره از ووکامرس')))]);
+
+                  final result = snapshot.data ?? const <String, dynamic>{};
+                  final source = result['items'];
+                  final rawOrders = source is List ? source : const <dynamic>[];
+                  final orders = <Map<String, dynamic>>[];
+
+                  for (final raw in rawOrders) {
+                    if (raw is! Map) continue;
+                    final order = Map<String, dynamic>.from(raw);
+                    if (_orderId(order) == null) continue;
+                    if (_search.isNotEmpty) {
+                      final haystack = '${order['id']} ${order['number'] ?? ''} ${order['customer'] ?? ''}'.toLowerCase();
+                      if (!haystack.contains(_search)) continue;
+                    }
+                    orders.add(order);
+                  }
+
+                  if (orders.isEmpty) {
+                    return ListView(
+                      padding: const EdgeInsets.all(24),
+                      children: [
+                        const SizedBox(height: 72),
+                        Icon(Icons.receipt_long_outlined, size: 58, color: Theme.of(context).colorScheme.outline),
+                        const SizedBox(height: 16),
+                        Text(
+                          _search.isNotEmpty
+                              ? 'سفارشی با این عبارت پیدا نشد.'
+                              : _status.isNotEmpty
+                                  ? 'سفارشی در این وضعیت وجود ندارد.'
+                                  : 'هیچ سفارشی از ووکامرس دریافت نشد.',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                        const SizedBox(height: 8),
+                        if (_search.isEmpty && _status.isEmpty)
+                          Text(
+                            'تعداد ثبت‌شده در فروشگاه: ${(result['store_total'] ?? 0).fa}\n'
+                            'نوع ذخیره‌سازی: ${result['storage'] ?? '-'} • افزونه ${result['plugin_version'] ?? '-'}',
+                            textAlign: TextAlign.center,
+                          ),
+                        const SizedBox(height: 18),
+                        Center(
+                          child: FilledButton.icon(
+                            onPressed: _load,
+                            icon: const Icon(Icons.sync_rounded),
+                            label: const Text('دریافت دوباره از ووکامرس'),
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+
                   return ListView.separated(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                     itemCount: orders.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 10),
                     itemBuilder: (context, index) {
-                      final order = Map<String, dynamic>.from(orders[index] as Map);
-                      final id = (order['id'] as num).toInt();
+                      final order = orders[index];
+                      final id = _orderId(order)!;
                       final status = '${order['status'] ?? ''}';
+                      final customer = '${order['customer'] ?? ''}'.trim();
+                      final total = order['total'] ?? 0;
+                      final currency = '${order['currency'] ?? ''}';
                       return Card(
                         child: InkWell(
                           borderRadius: BorderRadius.circular(20),
                           onTap: () async {
-                            await Navigator.push(context, MaterialPageRoute(builder: (_) => OrderDetailPage(orderId: id, client: widget.client)));
-                            _load();
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => OrderDetailPage(orderId: id, client: widget.client)),
+                            );
+                            if (mounted) _load();
                           },
                           child: Padding(
                             padding: const EdgeInsets.all(16),
                             child: Row(children: [
-                              Container(width: 46, height: 46, decoration: BoxDecoration(color: Theme.of(context).colorScheme.primaryContainer, borderRadius: BorderRadius.circular(15)), child: const Icon(Icons.receipt_long_rounded)),
+                              Container(
+                                width: 46,
+                                height: 46,
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.primaryContainer,
+                                  borderRadius: BorderRadius.circular(15),
+                                ),
+                                child: const Icon(Icons.receipt_long_rounded),
+                              ),
                               const SizedBox(width: 12),
-                              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                Text('سفارش ${id.fa}', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
-                                const SizedBox(height: 4),
-                                Text('${order['customer']?.toString().trim().isNotEmpty == true ? order['customer'] : 'مهمان'} • ${_statuses[status] ?? status}'),
-                                const SizedBox(height: 7),
-                                Text('${order['total'].fa} ${order['currency'] ?? ''}', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w800)),
-                              ])),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('سفارش ${id.fa}', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                                    const SizedBox(height: 4),
+                                    Text('${customer.isNotEmpty ? customer : 'مهمان'} • ${_statuses[status] ?? status}'),
+                                    const SizedBox(height: 7),
+                                    Text('$total $currency'.fa, style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w800)),
+                                  ],
+                                ),
+                              ),
                               const Icon(Icons.chevron_left_rounded),
                             ]),
                           ),
