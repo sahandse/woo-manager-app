@@ -6,6 +6,7 @@ import '../customers/customers_page.dart';
 import '../inventory/inventory_page.dart';
 import '../operations/operations_page.dart';
 import '../operations/workflow_center_page.dart';
+import '../reports/reports_page.dart';
 import '../settings/settings_page.dart';
 import '../shipping/shipping_center_page.dart';
 
@@ -21,6 +22,7 @@ class MorePage extends StatelessWidget {
           children: [
             _tile(context, Icons.local_shipping_outlined, 'مرکز ارسال', 'تاپین، استعلام هزینه، رهگیری و مرسوله‌ها', () => ShippingCenterPage(client: client)),
             _tile(context, Icons.inventory_outlined, 'انبار', 'کم‌موجودی، ناموجودها و اسکن بارکد', () => InventoryPage(client: client)),
+            _tile(context, Icons.bar_chart_rounded, 'گزارش‌ها', 'فروش، میانگین سفارش، پرفروش‌ها و سود', () => ReportsPage(client: client)),
             _tile(context, Icons.people_outline_rounded, 'مشتریان', 'پروفایل، خریدها، آدرس‌ها و سفارش‌ها', () => CustomersPage(client: client)),
             _tile(context, Icons.notifications_active_outlined, 'مرکز مدیریت', 'اعلان‌ها، کوپن‌ها و دیدگاه‌ها', () => OperationsPage(client: client)),
             _tile(context, Icons.hub_outlined, 'Workflow Center', 'مرجوعی، صف خطا، تیم، تاریخچه و سود', () => WorkflowCenterPage(client: client)),
