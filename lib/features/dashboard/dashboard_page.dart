@@ -1,61 +1,206 @@
 import 'package:flutter/material.dart';
-import 'dart:convert';
-import 'package:printing/printing.dart';
+
 import '../../core/network/api_client.dart';
+import '../../core/theme/theme_controller.dart';
+import '../inventory/inventory_page.dart';
+import '../more/more_page.dart';
+import '../operations/workflow_center_page.dart';
 import '../orders/order_detail_page.dart';
 import '../orders/orders_page.dart';
+import '../products/create_product_page.dart';
 import '../products/products_page.dart';
-import '../customers/customers_page.dart';
-import '../operations/operations_page.dart';
-import '../operations/workflow_center_page.dart';
-import '../settings/settings_page.dart';
-import '../content/content_page.dart';
-import '../../core/theme/theme_controller.dart';
+import '../shipping/shipping_center_page.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key, required this.storeName, required this.client});
   final String storeName;
   final ApiClient client;
-  @override State<DashboardPage> createState()=>_DashboardPageState();
+
+  @override
+  State<DashboardPage> createState() => _DashboardPageState();
 }
-class _DashboardPageState extends State<DashboardPage>{ late Future<List<dynamic>> orders;late Future<Map<String,dynamic>> report;int reportDays=30; int? busyOrder; bool batchBusy=false; final Set<int> selected={}; List<dynamic> visibleOrders=[]; @override void initState(){super.initState();orders=widget.client.orders();report=widget.client.reportSummary(days:reportDays);}void _refresh(){setState((){orders=widget.client.orders();report=widget.client.reportSummary(days:reportDays);});}void _setDays(int days){setState((){reportDays=days;report=widget.client.reportSummary(days:days);});}
-  Future<void> _print(List<String> ids,String type)async{final result=await widget.client.shipmentPdf(ids,type:type);await Printing.sharePdf(bytes:base64Decode(result['content_base64'] as String),filename:result['filename'] as String);}
-  Future<void> _ship(int orderId)async{setState(()=>busyOrder=orderId);try{final result=await widget.client.registerShipment(orderId,{});final raw=result['entries'];final entries=raw is Map?Map<String,dynamic>.from(raw):<String,dynamic>{};if(!mounted){return;}await showDialog(context:context,builder:(context)=>AlertDialog(title:const Text('مرسوله ثبت شد'),content:Text('کد رهگیری: ${entries['barcode']??'از تاپین دریافت نشد'}'),actions:[if(entries['id']!=null)TextButton(onPressed:()=>_print([entries['id'].toString()],'label'),child:const Text('لیبل PDF')),if(entries['order_id']!=null)TextButton(onPressed:()=>_print([entries['order_id'].toString()],'invoice'),child:const Text('فاکتور PDF')),TextButton(onPressed:()=>Navigator.pop(context),child:const Text('بستن'))]));setState(()=>orders=widget.client.orders());}catch(e){if(mounted){ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('ثبت مرسوله انجام نشد: $e')));}}finally{if(mounted){setState(()=>busyOrder=null);}}}
-  Future<void> _registerSelected()async{setState(()=>batchBusy=true);final failures=<String>[];for(final item in visibleOrders.where((o)=>selected.contains((o['id'] as num).toInt())&&o['tapin_order_id']==null)){try{await widget.client.registerShipment((item['id'] as num).toInt(),{});}catch(e){failures.add('#${item['id']}: $e');}}if(!mounted){return;}setState((){batchBusy=false;selected.clear();orders=widget.client.orders();});ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(failures.isEmpty?'مرسوله‌های انتخابی با موفقیت ثبت شدند.':'برخی سفارش‌ها ثبت نشدند:\n${failures.join('\n')}')));}
-  Future<void> _printSelected(String type)async{final key=type=='label'?'tapin_uuid':'tapin_order_id';final ids=visibleOrders.where((o)=>selected.contains((o['id'] as num).toInt())&&o[key]!=null).map((o)=>o[key].toString()).toList();if(ids.isEmpty){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('سفارش انتخابی دارای مرسوله ثبت‌شده نیست.')));return;}setState(()=>batchBusy=true);try{await _print(ids,type);}finally{if(mounted){setState(()=>batchBusy=false);}}}
-  @override Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(leading:Padding(padding:const EdgeInsets.all(8),child:ClipRRect(borderRadius:BorderRadius.circular(10),child:Image.asset('assets/woo_manager_logo.png',fit:BoxFit.cover))),title: Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(widget.storeName),Text('مدیریت فروشگاه',style:Theme.of(context).textTheme.bodySmall)]),actions:[ValueListenableBuilder(valueListenable:ThemeController.mode,builder:(context,mode,_)=>IconButton(tooltip:mode==ThemeMode.dark?'حالت روشن':'حالت تاریک',onPressed:ThemeController.toggle,icon:Icon(mode==ThemeMode.dark?Icons.light_mode_rounded:Icons.dark_mode_rounded))),IconButton(tooltip:'عملیات حرفه‌ای',onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>WorkflowCenterPage(client:widget.client))),icon:const Icon(Icons.qr_code_2_rounded)),IconButton(tooltip:'رسانه و محتوا',onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>ContentPage(client:widget.client))),icon:const Icon(Icons.perm_media_outlined)),IconButton(tooltip:'مرکز مدیریت',onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>OperationsPage(client:widget.client))),icon:const Icon(Icons.notifications_none_rounded)),IconButton(tooltip:'تنظیمات و امنیت',onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>SettingsPage(client:widget.client))),icon:const Icon(Icons.tune_rounded))]),
-    body: FutureBuilder<List<dynamic>>(future:orders,builder:(context,snapshot){if(snapshot.connectionState!=ConnectionState.done){return const Center(child:CircularProgressIndicator());}if(snapshot.hasError){return _Error(message:snapshot.error.toString(),retry:()=>setState(()=>orders=widget.client.orders()));}final list=snapshot.data??[];visibleOrders=list;final processing=list.where((o)=>o['status']=='processing').length;return ListView(padding:const EdgeInsets.all(16),children:[
-      Text('مرکز عملیات',style:Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight:FontWeight.w800)),const SizedBox(height:12),
-      SegmentedButton<int>(segments:const [ButtonSegment(value:7,label:Text('۷ روز')),ButtonSegment(value:30,label:Text('۳۰ روز')),ButtonSegment(value:90,label:Text('۹۰ روز'))],selected:{reportDays},onSelectionChanged:(value)=>_setDays(value.first)),const SizedBox(height:12),
-      FutureBuilder<Map<String,dynamic>>(future:report,builder:(context,s){if(s.connectionState!=ConnectionState.done)return const Card(child:Padding(padding:EdgeInsets.all(28),child:Center(child:CircularProgressIndicator())));if(s.hasError)return Card(child:Padding(padding:const EdgeInsets.all(16),child:Text('گزارش فروش دریافت نشد: ${s.error}')));return _ReportSummary(data:s.data!);}),const SizedBox(height:12),
-      GridView.count(shrinkWrap:true,physics:const NeverScrollableScrollPhysics(),crossAxisCount:2,mainAxisSpacing:12,crossAxisSpacing:12,childAspectRatio:1.45,children:[
-        _Stat(title:'آخرین سفارش‌ها',value:'${list.length}',icon:Icons.receipt_long_rounded),_Stat(title:'در حال انجام',value:'$processing',icon:Icons.local_shipping_outlined),
-      ]),const SizedBox(height:22),
-      Text('سفارش‌های واقعی',style:Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight:FontWeight.w700)),const SizedBox(height:10),
-      if(selected.isNotEmpty)Card(child:Padding(padding:const EdgeInsets.all(12),child:Wrap(spacing:8,runSpacing:8,children:[FilledButton.icon(onPressed:batchBusy?null:_registerSelected,icon:const Icon(Icons.local_shipping_outlined),label:Text('ثبت ${selected.length} سفارش')),OutlinedButton.icon(onPressed:batchBusy?null:()=>_printSelected('label'),icon:const Icon(Icons.qr_code_rounded),label:const Text('لیبل گروهی PDF')),OutlinedButton.icon(onPressed:batchBusy?null:()=>_printSelected('invoice'),icon:const Icon(Icons.print_outlined),label:const Text('فاکتور گروهی PDF')),TextButton(onPressed:batchBusy?null:()=>setState(selected.clear),child:const Text('لغو انتخاب'))]))),
-      if(list.isEmpty)const Card(child:Padding(padding:EdgeInsets.all(24),child:Text('سفارشی در ووکامرس وجود ندارد.',textAlign:TextAlign.center))) else ...list.map((o){final id=(o['id'] as num).toInt();final registered=o['tapin_order_id']!=null;return Card(child:ListTile(onTap:()async{await Navigator.push(context,MaterialPageRoute(builder:(_)=>OrderDetailPage(orderId:id,client:widget.client)));if(mounted)setState(()=>orders=widget.client.orders());},leading:Checkbox(value:selected.contains(id),onChanged:(value)=>setState(()=>value==true?selected.add(id):selected.remove(id))),title:Text('سفارش #$id'),subtitle:Text('${o['customer']} • ${o['status']}\n${o['total']} ${o['currency']}${registered?'\nرهگیری: ${o['tracking_number']??'در انتظار بارکد'}':''}'),isThreeLine:true,trailing:busyOrder==id?const SizedBox.square(dimension:22,child:CircularProgressIndicator(strokeWidth:2)):registered?const Icon(Icons.chevron_left_rounded):IconButton(tooltip:'ثبت واقعی در تاپین',onPressed:()=>_ship(id),icon:const Icon(Icons.local_shipping_outlined))));}),
-    ]);}),
-    bottomNavigationBar:NavigationBar(selectedIndex:0,onDestinationSelected:(index){if(index==1)Navigator.push(context,MaterialPageRoute(builder:(_)=>OrdersPage(client:widget.client)));if(index==2)Navigator.push(context,MaterialPageRoute(builder:(_)=>ProductsPage(client:widget.client)));if(index==3)Navigator.push(context,MaterialPageRoute(builder:(_)=>CustomersPage(client:widget.client)));},destinations:const [NavigationDestination(icon:Icon(Icons.dashboard_outlined),selectedIcon:Icon(Icons.dashboard_rounded),label:'خانه'),NavigationDestination(icon:Icon(Icons.receipt_long_outlined),selectedIcon:Icon(Icons.receipt_long_rounded),label:'سفارش‌ها'),NavigationDestination(icon:Icon(Icons.inventory_2_outlined),label:'محصولات'),NavigationDestination(icon:Icon(Icons.people_outline_rounded),label:'مشتریان')]),
-  );
-}
-class _Stat extends StatelessWidget { const _Stat({required this.title,required this.value,required this.icon});final String title,value;final IconData icon;@override Widget build(BuildContext context)=>Card(child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,mainAxisAlignment:MainAxisAlignment.spaceBetween,children:[Icon(icon),Text(value,style:Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight:FontWeight.w800)),Text(title)])));}
-class _Error extends StatelessWidget{const _Error({required this.message,required this.retry});final String message;final VoidCallback retry;@override Widget build(BuildContext context)=>Center(child:Padding(padding:const EdgeInsets.all(24),child:Column(mainAxisSize:MainAxisSize.min,children:[const Icon(Icons.cloud_off_rounded,size:44),const SizedBox(height:12),Text(message,textAlign:TextAlign.center),const SizedBox(height:16),FilledButton(onPressed:retry,child:const Text('تلاش دوباره'))])));}
-class _ReportSummary extends StatelessWidget {
-  const _ReportSummary({required this.data});
-  final Map<String,dynamic> data;
-  @override Widget build(BuildContext context){
-    final daily=data['daily'] as List? ?? const [];
-    final statuses=(data['statuses'] as List? ?? const []).where((s)=>(s['count'] as num? ?? 0)>0).toList();
-    final top=data['top_products'] as List? ?? const [];
-    final maxRevenue=daily.fold<double>(0,(m,e){final v=double.tryParse('${e['revenue']}')??0;return v>m?v:m;});
-    return Column(children:[
-      GridView.count(shrinkWrap:true,physics:const NeverScrollableScrollPhysics(),crossAxisCount:2,mainAxisSpacing:10,crossAxisSpacing:10,childAspectRatio:1.55,children:[_Metric(title:'فروش خالص',value:'${data['revenue']} ${data['currency']}',icon:Icons.payments_outlined),_Metric(title:'سفارش‌ها',value:'${data['orders_count']}',icon:Icons.receipt_long_outlined),_Metric(title:'میانگین خرید',value:'${data['average_order_value']} ${data['currency']}',icon:Icons.analytics_outlined),_Metric(title:'بازپرداخت',value:'${data['refunded']} ${data['currency']}',icon:Icons.currency_exchange_rounded)]),
-      const SizedBox(height:12),
-      Card(child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[Text('روند فروش روزانه',style:Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight:FontWeight.w700)),const SizedBox(height:16),if(maxRevenue==0)const Text('در این بازه فروش پرداخت‌شده‌ای ثبت نشده است.',textAlign:TextAlign.center)else SizedBox(height:130,child:Row(crossAxisAlignment:CrossAxisAlignment.end,children:daily.map((raw){final d=Map<String,dynamic>.from(raw as Map),v=double.tryParse('${d['revenue']}')??0;return Expanded(child:Tooltip(message:'${d['date']}: ${d['revenue']} ${data['currency']}',child:Padding(padding:const EdgeInsets.symmetric(horizontal:1),child:Container(height:8+112*(v/maxRevenue),decoration:BoxDecoration(color:Theme.of(context).colorScheme.primary,borderRadius:const BorderRadius.vertical(top:Radius.circular(4)))))));}).toList()))]))),
-      if(statuses.isNotEmpty)Card(child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[Text('وضعیت سفارش‌ها',style:Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight:FontWeight.w700)),const SizedBox(height:10),...statuses.map((raw){final s=Map<String,dynamic>.from(raw as Map);return Padding(padding:const EdgeInsets.symmetric(vertical:4),child:Row(children:[Expanded(child:Text('${s['label']}')),Text('${s['count']}',style:const TextStyle(fontWeight:FontWeight.w700))]));})]))),
-      if(top.isNotEmpty)Card(child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[Text('محصولات پرفروش',style:Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight:FontWeight.w700)),const SizedBox(height:8),...top.take(5).map((raw){final p=Map<String,dynamic>.from(raw as Map);return ListTile(contentPadding:EdgeInsets.zero,title:Text('${p['name']}'),subtitle:Text('${p['revenue']} ${data['currency']}'),trailing:Text('${p['quantity']} عدد'));})])))
-    ]);
+
+class _DashboardPageState extends State<DashboardPage> {
+  late Future<Map<String, dynamic>> report;
+  late Future<Map<String, dynamic>> orders;
+  int days = 30;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
   }
+
+  void _load() => setState(() {
+        report = widget.client.reportSummary(days: days);
+        orders = widget.client.ordersResult(limit: 20);
+      });
+
+  void _open(Widget page) => Navigator.push(context, MaterialPageRoute(builder: (_) => page)).then((_) => _load());
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(
+          leading: Padding(
+            padding: const EdgeInsets.all(8),
+            child: ClipRRect(borderRadius: BorderRadius.circular(11), child: Image.asset('assets/woo_manager_logo.png', fit: BoxFit.cover)),
+          ),
+          title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(widget.storeName, maxLines: 1, overflow: TextOverflow.ellipsis),
+            Text('مرکز مدیریت فروشگاه', style: Theme.of(context).textTheme.bodySmall),
+          ]),
+          actions: [
+            ValueListenableBuilder<ThemeMode>(
+              valueListenable: ThemeController.mode,
+              builder: (context, mode, _) => IconButton(
+                tooltip: mode == ThemeMode.dark ? 'حالت روشن' : 'حالت تاریک',
+                onPressed: ThemeController.toggle,
+                icon: Icon(mode == ThemeMode.dark ? Icons.light_mode_rounded : Icons.dark_mode_rounded),
+              ),
+            ),
+            IconButton(onPressed: _load, icon: const Icon(Icons.refresh_rounded)),
+          ],
+        ),
+        body: RefreshIndicator(
+          onRefresh: () async => _load(),
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Text('امروز چه کاری داریم؟', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900)),
+              const SizedBox(height: 12),
+              _quickActions(),
+              const SizedBox(height: 18),
+              SegmentedButton<int>(
+                segments: const [ButtonSegment(value: 7, label: Text('۷ روز')), ButtonSegment(value: 30, label: Text('۳۰ روز')), ButtonSegment(value: 90, label: Text('۹۰ روز'))],
+                selected: {days},
+                onSelectionChanged: (value) {
+                  days = value.first;
+                  _load();
+                },
+              ),
+              const SizedBox(height: 12),
+              FutureBuilder<Map<String, dynamic>>(
+                future: report,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState != ConnectionState.done) return const Card(child: Padding(padding: EdgeInsets.all(28), child: Center(child: CircularProgressIndicator())));
+                  if (snapshot.hasError) return Card(child: Padding(padding: const EdgeInsets.all(16), child: Text('گزارش فروش دریافت نشد: ${snapshot.error}')));
+                  final d = snapshot.data!;
+                  return GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                    childAspectRatio: 1.5,
+                    children: [
+                      _Metric('فروش', '${d['revenue']} ${d['currency']}', Icons.payments_outlined),
+                      _Metric('سفارش', '${d['orders_count']}', Icons.receipt_long_outlined),
+                      _Metric('میانگین خرید', '${d['average_order_value']} ${d['currency']}', Icons.analytics_outlined),
+                      _Metric('بازپرداخت', '${d['refunded']} ${d['currency']}', Icons.currency_exchange_rounded),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 20),
+              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                Text('آخرین سفارش‌ها', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                TextButton(onPressed: () => _open(OrdersPage(client: widget.client)), child: const Text('مشاهده همه')),
+              ]),
+              FutureBuilder<Map<String, dynamic>>(
+                future: orders,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState != ConnectionState.done) return const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()));
+                  final raw = snapshot.data?['items'] as List? ?? const [];
+                  final items = raw.whereType<Map>().take(6).map((m) => Map<String, dynamic>.from(m)).toList();
+                  if (items.isEmpty) return const Card(child: Padding(padding: EdgeInsets.all(22), child: Text('سفارشی برای نمایش وجود ندارد.', textAlign: TextAlign.center)));
+                  return Column(
+                    children: items.map((o) {
+                      final id = o['id'] is num ? (o['id'] as num).toInt() : int.tryParse('${o['id']}') ?? 0;
+                      final registered = o['tapin_order_id'] != null;
+                      return Card(
+                        child: ListTile(
+                          onTap: () => _open(OrderDetailPage(orderId: id, client: widget.client)),
+                          leading: CircleAvatar(child: Icon(registered ? Icons.local_shipping_outlined : Icons.receipt_long_outlined)),
+                          title: Text('سفارش #$id', style: const TextStyle(fontWeight: FontWeight.w800)),
+                          subtitle: Text('${o['customer'] ?? 'مهمان'} • ${o['status'] ?? '-'}\n${o['total'] ?? 0} ${o['currency'] ?? ''}'),
+                          isThreeLine: true,
+                          trailing: const Icon(Icons.chevron_left_rounded),
+                        ),
+                      );
+                    }).toList(),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: 0,
+          onDestinationSelected: (index) {
+            if (index == 1) _open(OrdersPage(client: widget.client));
+            if (index == 2) _open(ProductsPage(client: widget.client));
+            if (index == 3) _open(WorkflowCenterPage(client: widget.client));
+            if (index == 4) _open(MorePage(client: widget.client));
+          },
+          destinations: const [
+            NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home_rounded), label: 'خانه'),
+            NavigationDestination(icon: Icon(Icons.receipt_long_outlined), label: 'سفارشات'),
+            NavigationDestination(icon: Icon(Icons.inventory_2_outlined), label: 'محصولات'),
+            NavigationDestination(icon: Icon(Icons.hub_outlined), label: 'عملیات'),
+            NavigationDestination(icon: Icon(Icons.more_horiz_rounded), label: 'بیشتر'),
+          ],
+        ),
+      );
+
+  Widget _quickActions() => GridView.count(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        crossAxisCount: 4,
+        mainAxisSpacing: 8,
+        crossAxisSpacing: 8,
+        childAspectRatio: .82,
+        children: [
+          _Quick(Icons.add_box_outlined, 'محصول جدید', () => _open(CreateProductPage(client: widget.client))),
+          _Quick(Icons.local_shipping_outlined, 'مرکز ارسال', () => _open(ShippingCenterPage(client: widget.client))),
+          _Quick(Icons.qr_code_scanner_rounded, 'انبار', () => _open(InventoryPage(client: widget.client))),
+          _Quick(Icons.hub_outlined, 'نیازمند اقدام', () => _open(WorkflowCenterPage(client: widget.client))),
+        ],
+      );
 }
-class _Metric extends StatelessWidget{const _Metric({required this.title,required this.value,required this.icon});final String title,value;final IconData icon;@override Widget build(BuildContext context)=>Card(child:Padding(padding:const EdgeInsets.all(14),child:Column(crossAxisAlignment:CrossAxisAlignment.start,mainAxisAlignment:MainAxisAlignment.spaceBetween,children:[Icon(icon,size:20),Text(value,maxLines:1,overflow:TextOverflow.ellipsis,style:Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight:FontWeight.w800)),Text(title)])));}
+
+class _Quick extends StatelessWidget {
+  const _Quick(this.icon, this.label, this.onTap);
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Card(
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(icon), const SizedBox(height: 8), Text(label, textAlign: TextAlign.center, maxLines: 2)]),
+          ),
+        ),
+      );
+}
+
+class _Metric extends StatelessWidget {
+  const _Metric(this.title, this.value, this.icon);
+  final String title;
+  final String value;
+  final IconData icon;
+  @override
+  Widget build(BuildContext context) => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Icon(icon, size: 20),
+            Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900)),
+            Text(title),
+          ]),
+        ),
+      );
+}
