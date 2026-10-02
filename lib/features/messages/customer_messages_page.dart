@@ -15,20 +15,35 @@ class _CustomerMessagesPageState extends State<CustomerMessagesPage> {
   late final TextEditingController order;
   final message = TextEditingController();
   bool busy = false;
+  bool changeStatus = false;
+  String selectedStatus = '';
+  String selectedTitle = '';
+  late Future<Map<String, dynamic>?> templatesFuture;
 
-  static const templates = <String, String>{
-    'دریافت سفارش': 'سفارش شما با موفقیت دریافت شد و در صف بررسی قرار گرفت.',
-    'در حال آماده‌سازی': 'سفارش شما در حال آماده‌سازی و بسته‌بندی است.',
-    'تحویل به پست': 'سفارش شما آماده ارسال است و به فرایند پستی تحویل داده می‌شود.',
-    'کد رهگیری': 'سفارش شما ارسال شد. کد رهگیری در اطلاعات سفارش ثبت شده است.',
-    'مشکل آدرس': 'برای ارسال سفارش، اطلاعات آدرس یا کدپستی نیاز به بررسی دارد. لطفاً با فروشگاه در تماس باشید.',
-    'نیاز به تماس': 'برای تکمیل سفارش نیاز است با شما هماهنگ کنیم. لطفاً با فروشگاه تماس بگیرید.',
-  };
+  static const fallbackTemplates = <Map<String, String>>[
+    {'title': 'ثبت سفارش', 'status': 'pending', 'message': 'سفارش شما با موفقیت ثبت شد و در انتظار پرداخت/تأیید است.'},
+    {'title': 'در حال آماده‌سازی', 'status': 'processing', 'message': 'سفارش شما در حال آماده‌سازی و بسته‌بندی است.'},
+    {'title': 'آماده برای ارسال', 'status': 'processing', 'message': 'سفارش شما آماده ارسال است و به‌زودی تحویل پست می‌شود.'},
+    {'title': 'تحویل به پست', 'status': 'processing', 'message': 'سفارش شما تحویل پست شد.'},
+    {'title': 'تکمیل سفارش', 'status': 'completed', 'message': 'سفارش شما تکمیل شد. از خرید شما سپاسگزاریم.'},
+    {'title': 'نیاز به اصلاح آدرس', 'status': '', 'message': 'برای ارسال سفارش، آدرس یا کدپستی نیاز به بررسی دارد. لطفاً با فروشگاه تماس بگیرید.'},
+  ];
 
   @override
   void initState() {
     super.initState();
     order = TextEditingController(text: widget.orderId?.toString() ?? '');
+    templatesFuture = _loadTemplates();
+  }
+
+  Future<Map<String, dynamic>?> _loadTemplates() async {
+    final id = widget.orderId ?? int.tryParse(order.text.trim());
+    if (id == null) return null;
+    try {
+      return await widget.client.orderMessageTemplates(id);
+    } catch (_) {
+      return null;
+    }
   }
 
   @override
@@ -36,6 +51,24 @@ class _CustomerMessagesPageState extends State<CustomerMessagesPage> {
     order.dispose();
     message.dispose();
     super.dispose();
+  }
+
+  List<Map<String, dynamic>> _templates(Map<String, dynamic>? data) {
+    final raw = data?['items'];
+    if (raw is List) {
+      final items = raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+      if (items.isNotEmpty) return items;
+    }
+    return fallbackTemplates.map((e) => Map<String, dynamic>.from(e)).toList();
+  }
+
+  void _choose(Map<String, dynamic> template) {
+    setState(() {
+      selectedTitle = '${template['title'] ?? ''}';
+      selectedStatus = '${template['status'] ?? ''}';
+      message.text = '${template['message'] ?? ''}';
+      changeStatus = selectedStatus.isNotEmpty;
+    });
   }
 
   Future<void> _send() async {
@@ -46,8 +79,14 @@ class _CustomerMessagesPageState extends State<CustomerMessagesPage> {
     }
     setState(() => busy = true);
     try {
+      if (changeStatus && selectedStatus.isNotEmpty) {
+        await widget.client.updateOrderStatus(id, selectedStatus);
+      }
       await widget.client.sendOrderMessage(id, message.text.trim());
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('پیام برای مشتری ارسال شد.')));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(changeStatus && selectedStatus.isNotEmpty ? 'وضعیت سفارش تغییر کرد و پیامک ارسال شد.' : 'پیام برای مشتری ارسال شد.')),
+      );
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('ارسال پیام انجام نشد: $e')));
     } finally {
@@ -57,24 +96,59 @@ class _CustomerMessagesPageState extends State<CustomerMessagesPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('پیام به مشتری')),
+        appBar: AppBar(title: const Text('پیام و تغییر وضعیت سفارش')),
         body: ListView(
           padding: const EdgeInsets.all(16),
           children: [
             if (busy) const LinearProgressIndicator(),
-            TextField(controller: order, enabled: widget.orderId == null, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'شماره سفارش')),
-            const SizedBox(height: 14),
-            Text('پیام‌های آماده', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: templates.entries.map((e) => ActionChip(label: Text(e.key), onPressed: () => setState(() => message.text = e.value))).toList(),
+            TextField(
+              controller: order,
+              enabled: widget.orderId == null,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'شماره سفارش'),
+              onSubmitted: (_) => setState(() => templatesFuture = _loadTemplates()),
             ),
-            const SizedBox(height: 14),
-            TextField(controller: message, minLines: 4, maxLines: 8, decoration: const InputDecoration(labelText: 'متن پیام', alignLabelWithHint: true)),
-            const SizedBox(height: 14),
-            FilledButton.icon(onPressed: busy ? null : _send, icon: const Icon(Icons.send_rounded), label: const Text('ارسال پیامک')),
+            const SizedBox(height: 16),
+            Text('الگوهای تغییر وضعیت', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900)),
+            const SizedBox(height: 6),
+            Text('الگو را انتخاب کن؛ متن با اطلاعات واقعی همین سفارش پر می‌شود.', style: Theme.of(context).textTheme.bodySmall),
+            const SizedBox(height: 10),
+            FutureBuilder<Map<String, dynamic>?>(
+              future: templatesFuture,
+              builder: (context, snapshot) {
+                final items = _templates(snapshot.data);
+                return Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: items.map((e) => ChoiceChip(
+                    label: Text('${e['title']}'),
+                    selected: selectedTitle == '${e['title']}',
+                    onSelected: (_) => _choose(e),
+                  )).toList(),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: message,
+              minLines: 4,
+              maxLines: 8,
+              decoration: const InputDecoration(labelText: 'متن پیامک', alignLabelWithHint: true),
+            ),
+            const SizedBox(height: 8),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: changeStatus,
+              onChanged: selectedStatus.isEmpty ? null : (v) => setState(() => changeStatus = v),
+              title: const Text('تغییر وضعیت سفارش همراه پیامک'),
+              subtitle: Text(selectedStatus.isEmpty ? 'این الگو وضعیت سفارش را تغییر نمی‌دهد.' : 'وضعیت مقصد: $selectedStatus'),
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: busy ? null : _send,
+              icon: const Icon(Icons.send_rounded),
+              label: const Text('اعمال وضعیت و ارسال پیامک'),
+            ),
           ],
         ),
       );
