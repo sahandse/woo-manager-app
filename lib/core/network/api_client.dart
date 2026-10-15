@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 
 class ApiClient {
   ApiClient(String siteUrl, String token)
-      : _dio = Dio(BaseOptions(baseUrl: '${siteUrl.replaceAll(RegExp(r'/$'), '')}/wp-json/woo-manager/v1', headers: {'Authorization': 'Bearer $token'}, connectTimeout: const Duration(seconds: 15)));
+      : _dio = Dio(BaseOptions(baseUrl: '${siteUrl.replaceAll(RegExp(r'/$'), '')}/wp-json/woo-manager/v1', headers: {'X-Woo-Manager-Token': token}, connectTimeout: const Duration(seconds: 15)));
   final Dio _dio;
   static Future<Map<String, dynamic>> pair(String siteUrl, String code, String deviceId) async {
     final base = siteUrl.replaceAll(RegExp(r'/$'), '');
